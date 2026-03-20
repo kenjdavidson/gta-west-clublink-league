@@ -34,7 +34,7 @@ jobs:
         env:
           GOLFCANADA_USERNAME: ${{ secrets.GOLFCANADA_USERNAME }}
           GOLFCANADA_PASSWORD: ${{ secrets.GOLFCANADA_PASSWORD }}
-        run: npm run fetch-and-build
+        run: npm run build
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
