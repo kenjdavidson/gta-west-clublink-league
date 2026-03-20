@@ -57,6 +57,18 @@ if (!USERNAME || !PASSWORD) {
   process.exit(1);
 }
 
+// Warn early if any member's golfCanadaId does not look like a numeric ID.
+// The Golf Canada snapshot endpoint requires the numeric user.id from the
+// login response (e.g. "12345678"), not a prefixed string like "GC1000001".
+for (const member of config.members) {
+  if (!/^\d+$/.test(member.golfCanadaId)) {
+    console.warn(
+      `Warning: member "${member.name}" has golfCanadaId "${member.golfCanadaId}" which is not a numeric value. ` +
+        `Update league.json to use the numeric Golf Canada user ID (the "id" field returned by the login API).`
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Golf Canada API types
 // ---------------------------------------------------------------------------
@@ -131,9 +143,9 @@ async function authenticate(): Promise<GolfCanadaLoginResponse> {
  * Fetch the Golf Canada snapshot for a member.
  *
  * NOTE: `member.golfCanadaId` must be the member's numeric Golf Canada user
- * ID (as returned in the `user.id` field of the login response).  The
- * placeholder values in league.json ("GC1000001", etc.) need to be replaced
- * with the real numeric IDs before this endpoint will return data.
+ * ID (the `user.id` field returned by the login API, e.g. "12345678").
+ * Non-numeric values such as "GC1000001" are invalid and will cause the
+ * Golf Canada API to return an HTML error page instead of JSON.
  */
 async function fetchSnapshot(
   memberId: string,
@@ -152,6 +164,18 @@ async function fetchSnapshot(
   if (!response.ok) {
     throw new Error(
       `Failed to fetch snapshot for member ${memberId}: ${response.status} ${response.statusText}`
+    );
+  }
+
+  // Guard against HTML responses (e.g. redirect to login page for invalid
+  // member IDs).  fetch() follows redirects by default, so a 302 → 200 HTML
+  // page bypasses the response.ok check above.
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `Golf Canada returned non-JSON response (${contentType}) for member ID "${memberId}". ` +
+        `Ensure golfCanadaId in league.json is the numeric Golf Canada user ID ` +
+        `(the "user.id" value returned by the login API, not a prefixed string like "GC1000001").`
     );
   }
 

@@ -7,17 +7,17 @@
     {
       "name": "Player One",
       "memberNumber": "1000001",
-      "golfCanadaId": "GC1000001"
+      "golfCanadaId": "10000001"
     },
     {
       "name": "Player Two",
       "memberNumber": "1000002",
-      "golfCanadaId": "GC1000002"
+      "golfCanadaId": "10000002"
     },
     {
       "name": "Player Three",
       "memberNumber": "1000003",
-      "golfCanadaId": "GC1000003"
+      "golfCanadaId": "10000003"
     }
   ],
   "courses": [
