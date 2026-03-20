@@ -58,14 +58,25 @@ if (!USERNAME || !PASSWORD) {
 }
 
 // ---------------------------------------------------------------------------
-// Golf Canada API helpers
+// Golf Canada API types
 // ---------------------------------------------------------------------------
 
-interface GolfCanadaSession {
-  accessToken: string;
+interface GolfCanadaUser {
+  id: number;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  handicap: string;
+  membershipLevel: string;
+  expirationDate: string;
 }
 
-interface GolfCanadaRound {
+interface GolfCanadaLoginResponse {
+  access_token: string;
+  user: GolfCanadaUser;
+}
+
+interface GolfCanadaScore {
   course: string;
   datePlayed: string;
   holesPlayed: number;
@@ -73,11 +84,21 @@ interface GolfCanadaRound {
   isUsedInCalc: boolean;
 }
 
+interface GolfCanadaSnapshot {
+  club: string;
+  scores: GolfCanadaScore[];
+  ytdYear: number;
+}
+
+// ---------------------------------------------------------------------------
+// Golf Canada API helpers
+// ---------------------------------------------------------------------------
+
 /**
- * Authenticate with the Golf Canada OAuth2 token endpoint (password grant)
- * and return the session access token.
+ * Authenticate with the Golf Canada OAuth2 token endpoint (password grant).
+ * Returns the full login response including the access token and user profile.
  */
-async function authenticate(): Promise<GolfCanadaSession> {
+async function authenticate(): Promise<GolfCanadaLoginResponse> {
   const body = new URLSearchParams({
     grant_type: "password",
     username: USERNAME!,
@@ -97,27 +118,32 @@ async function authenticate(): Promise<GolfCanadaSession> {
     );
   }
 
-  const data = (await response.json()) as { access_token: string };
-  if (!data.access_token) {
-    throw new Error("Authentication response did not include an access_token");
+  const data = (await response.json()) as Record<string, unknown>;
+  if (!data.access_token || !data.user) {
+    throw new Error(
+      "Authentication response is missing required fields (access_token, user)"
+    );
   }
-  return { accessToken: data.access_token };
+  return data as unknown as GolfCanadaLoginResponse;
 }
 
 /**
- * Fetch all rounds for a given member in the specified year using the
- * Golf Canada member snapshot endpoint.
+ * Fetch the Golf Canada snapshot for a member.
+ *
+ * NOTE: `member.golfCanadaId` must be the member's numeric Golf Canada user
+ * ID (as returned in the `user.id` field of the login response).  The
+ * placeholder values in league.json ("GC1000001", etc.) need to be replaced
+ * with the real numeric IDs before this endpoint will return data.
  */
-async function fetchRoundsForMember(
-  session: GolfCanadaSession,
-  member: Member,
-  year: number
-): Promise<GolfCanadaRound[]> {
+async function fetchSnapshot(
+  memberId: string,
+  accessToken: string
+): Promise<GolfCanadaSnapshot> {
   const response = await fetch(
-    `${GOLFCANADA_BASE_URL}/members/${member.golfCanadaId}/getSnapshot`,
+    `${GOLFCANADA_BASE_URL}/members/${memberId}/getSnapshot`,
     {
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
     }
@@ -125,15 +151,32 @@ async function fetchRoundsForMember(
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch snapshot for ${member.name}: ${response.status} ${response.statusText}`
+      `Failed to fetch snapshot for member ${memberId}: ${response.status} ${response.statusText}`
     );
   }
 
-  const data = (await response.json()) as { scores: GolfCanadaRound[] };
-  const allScores = data.scores ?? [];
+  const data = (await response.json()) as Record<string, unknown>;
+  if (!data.club || !Array.isArray(data.scores)) {
+    throw new Error(
+      `Snapshot response for member ${memberId} is missing required fields (club, scores)`
+    );
+  }
+  return data as unknown as GolfCanadaSnapshot;
+}
 
-  // The snapshot returns year-to-date scores; filter to the requested year.
-  return allScores.filter(
+/**
+ * Fetch all rounds for a given member in the specified year using the
+ * Golf Canada member snapshot endpoint.
+ */
+async function fetchRoundsForMember(
+  loginData: GolfCanadaLoginResponse,
+  member: Member,
+  year: number
+): Promise<GolfCanadaScore[]> {
+  const snapshot = await fetchSnapshot(member.golfCanadaId, loginData.access_token);
+
+  // Filter to the requested year using the datePlayed field.
+  return snapshot.scores.filter(
     (r) => new Date(r.datePlayed).getFullYear() === year
   );
 }
@@ -144,7 +187,7 @@ async function fetchRoundsForMember(
 
 /**
  * From an array of rounds played at a specific course, return the best
- * (lowest score differential) `count` rounds.
+ * (lowest score) `count` rounds.
  */
 function pickBestRounds(rounds: Round[], count: number): Round[] {
   return [...rounds]
@@ -160,13 +203,12 @@ function pickBestRounds(rounds: Round[], count: number): Round[] {
  * comparison.  The course names in league.json must match the names returned
  * by the Golf Canada API exactly (case aside).
  *
- * The adjusted gross score is used as the differential/ranking value because
- * the snapshot endpoint does not supply course rating or slope data needed for
- * a full WHS differential calculation.
+ * The snapshot API does not include tee information, so tee filtering is
+ * not applied here.  The adjusted gross score is used as the ranking value.
  */
 function buildPlayerScore(
   member: Member,
-  allRounds: GolfCanadaRound[],
+  allScores: GolfCanadaScore[],
   courses: Course[]
 ): PlayerScore {
   // Build a lookup map: lower-case Golf Canada course name → configured course.
@@ -174,7 +216,7 @@ function buildPlayerScore(
     courses.map((c) => [c.name.toLowerCase(), c])
   );
 
-  const rounds: Round[] = allRounds.map((r) => {
+  const rounds: Round[] = allScores.map((r) => {
     const matched = courseByName.get(r.course.toLowerCase());
     return {
       date: r.datePlayed,
@@ -205,15 +247,15 @@ function buildPlayerScore(
 async function main() {
   console.log(`Fetching scores for ${YEAR}…`);
 
-  const session = await authenticate();
-  console.log("Authenticated with Golf Canada API.");
+  const loginData = await authenticate();
+  console.log(`Authenticated as ${loginData.user.fullName}.`);
 
   const playerScores: PlayerScore[] = [];
 
   for (const member of config.members) {
     console.log(`  Fetching rounds for ${member.name}…`);
-    const apiRounds = await fetchRoundsForMember(session, member, YEAR);
-    const playerScore = buildPlayerScore(member, apiRounds, config.courses);
+    const apiScores = await fetchRoundsForMember(loginData, member, YEAR);
+    const playerScore = buildPlayerScore(member, apiScores, config.courses);
     playerScores.push(playerScore);
   }
 
