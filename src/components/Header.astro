@@ -2,9 +2,10 @@
 interface Props {
   years: number[];
   currentYear: number;
+  leagueName?: string;
 }
 
-const { years, currentYear } = Astro.props;
+const { years, currentYear, leagueName = "West GTA Clublink Men's Invitational" } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 
@@ -16,12 +17,12 @@ const base = import.meta.env.BASE_URL;
         <a href={base} class="flex items-center gap-3 group">
           <img
             src={`${base}logo.svg`}
-            alt="GTA West Clublink League logo"
-            class="h-10 w-10 object-contain"
+            alt="West GTA Clublink Men's Invitational logo"
+            class="h-12 w-12 object-contain"
             onerror="this.style.display='none'"
           />
           <span class="text-xl font-bold tracking-tight text-white group-hover:text-yellow-300 transition-colors">
-            GTA West Clublink League
+            {leagueName}
           </span>
         </a>
       </div>
