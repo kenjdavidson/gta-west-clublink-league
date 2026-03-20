@@ -66,11 +66,11 @@ interface GolfCanadaSession {
 }
 
 interface GolfCanadaRound {
-  played_at: string;
-  facility_id: string;
-  facility_name: string;
-  adjusted_gross_score: number;
-  score_differential: number;
+  course: string;
+  datePlayed: string;
+  holesPlayed: number;
+  score: number;
+  isUsedInCalc: boolean;
 }
 
 /**
@@ -105,20 +105,16 @@ async function authenticate(): Promise<GolfCanadaSession> {
 }
 
 /**
- * Fetch all rounds for a given member in the specified year.
+ * Fetch all rounds for a given member in the specified year using the
+ * Golf Canada member snapshot endpoint.
  */
 async function fetchRoundsForMember(
   session: GolfCanadaSession,
   member: Member,
   year: number
 ): Promise<GolfCanadaRound[]> {
-  const params = new URLSearchParams({
-    member_id: member.golfCanadaId,
-    year: String(year),
-  });
-
   const response = await fetch(
-    `${GOLFCANADA_BASE_URL}/scores?${params.toString()}`,
+    `${GOLFCANADA_BASE_URL}/members/${member.golfCanadaId}/getSnapshot`,
     {
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
@@ -129,12 +125,17 @@ async function fetchRoundsForMember(
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch rounds for ${member.name}: ${response.status} ${response.statusText}`
+      `Failed to fetch snapshot for ${member.name}: ${response.status} ${response.statusText}`
     );
   }
 
-  const data = (await response.json()) as { rounds: GolfCanadaRound[] };
-  return data.rounds ?? [];
+  const data = (await response.json()) as { scores: GolfCanadaRound[] };
+  const allScores = data.scores ?? [];
+
+  // The snapshot returns year-to-date scores; filter to the requested year.
+  return allScores.filter(
+    (r) => new Date(r.datePlayed).getFullYear() === year
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -153,19 +154,36 @@ function pickBestRounds(rounds: Round[], count: number): Round[] {
 
 /**
  * Build a PlayerScore record for one member across all configured courses.
+ *
+ * The Golf Canada snapshot API returns course names (not facility IDs), so
+ * rounds are matched to configured courses using exact case-insensitive name
+ * comparison.  The course names in league.json must match the names returned
+ * by the Golf Canada API exactly (case aside).
+ *
+ * The adjusted gross score is used as the differential/ranking value because
+ * the snapshot endpoint does not supply course rating or slope data needed for
+ * a full WHS differential calculation.
  */
 function buildPlayerScore(
   member: Member,
   allRounds: GolfCanadaRound[],
   courses: Course[]
 ): PlayerScore {
-  const rounds: Round[] = allRounds.map((r) => ({
-    date: r.played_at,
-    courseId: r.facility_id,
-    courseName: r.facility_name,
-    score: r.adjusted_gross_score,
-    differential: r.score_differential,
-  }));
+  // Build a lookup map: lower-case Golf Canada course name → configured course.
+  const courseByName = new Map<string, Course>(
+    courses.map((c) => [c.name.toLowerCase(), c])
+  );
+
+  const rounds: Round[] = allRounds.map((r) => {
+    const matched = courseByName.get(r.course.toLowerCase());
+    return {
+      date: r.datePlayed,
+      courseId: matched?.clubId ?? "",
+      courseName: r.course,
+      score: r.score,
+      differential: r.score,
+    };
+  });
 
   const bestRoundsByCourse: Record<string, Round[]> = {};
   let totalScore = 0;
