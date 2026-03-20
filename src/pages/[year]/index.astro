@@ -31,7 +31,7 @@ const scores = await getYearlyScores(Number(year), config);
 ---
 
 <Layout title={`${config.league.name} – ${year}`}>
-  <Header years={[Number(year)]} currentYear={Number(year)} />
+  <Header years={[Number(year)]} currentYear={Number(year)} leagueName={config.league.name} />
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex gap-6">
