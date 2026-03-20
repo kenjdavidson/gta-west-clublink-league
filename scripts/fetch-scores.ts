@@ -57,20 +57,8 @@ if (!USERNAME || !PASSWORD) {
   process.exit(1);
 }
 
-// Warn early if any member's golfCanadaId does not look like a numeric ID.
-// The Golf Canada snapshot endpoint requires the numeric user.id from the
-// login response (e.g. "12345678"), not a prefixed string like "GC1000001".
-for (const member of config.members) {
-  if (!/^\d+$/.test(member.golfCanadaId)) {
-    console.warn(
-      `Warning: member "${member.name}" has golfCanadaId "${member.golfCanadaId}" which is not a numeric value. ` +
-        `Update league.json to use the numeric Golf Canada user ID (the "id" field returned by the login API).`
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Golf Canada API types
+// Golf Canada API helpers
 // ---------------------------------------------------------------------------
 
 interface GolfCanadaUser {
@@ -88,23 +76,14 @@ interface GolfCanadaLoginResponse {
   user: GolfCanadaUser;
 }
 
-interface GolfCanadaScore {
-  course: string;
-  datePlayed: string;
-  holesPlayed: number;
-  score: number;
-  isUsedInCalc: boolean;
+interface GolfCanadaRound {
+  played_at: string;
+  facility_id: string;
+  facility_name: string;
+  tee_name?: string;
+  adjusted_gross_score: number;
+  score_differential: number;
 }
-
-interface GolfCanadaSnapshot {
-  club: string;
-  scores: GolfCanadaScore[];
-  ytdYear: number;
-}
-
-// ---------------------------------------------------------------------------
-// Golf Canada API helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Authenticate with the Golf Canada OAuth2 token endpoint (password grant).
@@ -140,22 +119,23 @@ async function authenticate(): Promise<GolfCanadaLoginResponse> {
 }
 
 /**
- * Fetch the Golf Canada snapshot for a member.
- *
- * NOTE: `member.golfCanadaId` must be the member's numeric Golf Canada user
- * ID (the `user.id` field returned by the login API, e.g. "12345678").
- * Non-numeric values such as "GC1000001" are invalid and will cause the
- * Golf Canada API to return an HTML error page instead of JSON.
+ * Fetch all rounds for a given member in the specified year.
  */
-async function fetchSnapshot(
-  memberId: string,
-  accessToken: string
-): Promise<GolfCanadaSnapshot> {
+async function fetchRoundsForMember(
+  loginData: GolfCanadaLoginResponse,
+  member: Member,
+  year: number
+): Promise<GolfCanadaRound[]> {
+  const params = new URLSearchParams({
+    member_id: member.golfCanadaId,
+    year: String(year),
+  });
+
   const response = await fetch(
-    `${GOLFCANADA_BASE_URL}/members/${memberId}/getSnapshot`,
+    `${GOLFCANADA_BASE_URL}/scores?${params.toString()}`,
     {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${loginData.access_token}`,
         "Content-Type": "application/json",
       },
     }
@@ -163,46 +143,12 @@ async function fetchSnapshot(
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch snapshot for member ${memberId}: ${response.status} ${response.statusText}`
+      `Failed to fetch rounds for ${member.name}: ${response.status} ${response.statusText}`
     );
   }
 
-  // Guard against HTML responses (e.g. redirect to login page for invalid
-  // member IDs).  fetch() follows redirects by default, so a 302 → 200 HTML
-  // page bypasses the response.ok check above.
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Error(
-      `Golf Canada returned non-JSON response (${contentType}) for member ID "${memberId}". ` +
-        `Ensure golfCanadaId in league.json is the numeric Golf Canada user ID ` +
-        `(the "user.id" value returned by the login API, not a prefixed string like "GC1000001").`
-    );
-  }
-
-  const data = (await response.json()) as Record<string, unknown>;
-  if (!data.club || !Array.isArray(data.scores)) {
-    throw new Error(
-      `Snapshot response for member ${memberId} is missing required fields (club, scores)`
-    );
-  }
-  return data as unknown as GolfCanadaSnapshot;
-}
-
-/**
- * Fetch all rounds for a given member in the specified year using the
- * Golf Canada member snapshot endpoint.
- */
-async function fetchRoundsForMember(
-  loginData: GolfCanadaLoginResponse,
-  member: Member,
-  year: number
-): Promise<GolfCanadaScore[]> {
-  const snapshot = await fetchSnapshot(member.golfCanadaId, loginData.access_token);
-
-  // Filter to the requested year using the datePlayed field.
-  return snapshot.scores.filter(
-    (r) => new Date(r.datePlayed).getFullYear() === year
-  );
+  const data = (await response.json()) as { rounds: GolfCanadaRound[] };
+  return data.rounds ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +157,7 @@ async function fetchRoundsForMember(
 
 /**
  * From an array of rounds played at a specific course, return the best
- * (lowest score) `count` rounds.
+ * (lowest score differential) `count` rounds.
  */
 function pickBestRounds(rounds: Round[], count: number): Round[] {
   return [...rounds]
@@ -221,41 +167,31 @@ function pickBestRounds(rounds: Round[], count: number): Round[] {
 
 /**
  * Build a PlayerScore record for one member across all configured courses.
- *
- * The Golf Canada snapshot API returns course names (not facility IDs), so
- * rounds are matched to configured courses using exact case-insensitive name
- * comparison.  The course names in league.json must match the names returned
- * by the Golf Canada API exactly (case aside).
- *
- * The snapshot API does not include tee information, so tee filtering is
- * not applied here.  The adjusted gross score is used as the ranking value.
  */
 function buildPlayerScore(
   member: Member,
-  allScores: GolfCanadaScore[],
+  allRounds: GolfCanadaRound[],
   courses: Course[]
 ): PlayerScore {
-  // Build a lookup map: lower-case Golf Canada course name → configured course.
-  const courseByName = new Map<string, Course>(
-    courses.map((c) => [c.name.toLowerCase(), c])
-  );
-
-  const rounds: Round[] = allScores.map((r) => {
-    const matched = courseByName.get(r.course.toLowerCase());
-    return {
-      date: r.datePlayed,
-      courseId: matched?.clubId ?? "",
-      courseName: r.course,
-      score: r.score,
-      differential: r.score,
-    };
-  });
+  const rounds: Round[] = allRounds.map((r) => ({
+    date: r.played_at,
+    courseId: r.facility_id,
+    courseName: r.facility_name,
+    tee: r.tee_name,
+    score: r.adjusted_gross_score,
+    differential: r.score_differential,
+  }));
 
   const bestRoundsByCourse: Record<string, Round[]> = {};
   let totalScore = 0;
 
   for (const course of courses) {
-    const courseRounds = rounds.filter((r) => r.courseId === course.clubId);
+    const courseRounds = rounds.filter(
+      (r) =>
+        r.courseId === course.clubId &&
+        (!course.tee ||
+          r.tee?.toLowerCase() === course.tee.toLowerCase())
+    );
     const best = pickBestRounds(courseRounds, course.roundsCount);
     bestRoundsByCourse[course.clubId] = best;
     totalScore += best.reduce((sum, r) => sum + r.differential, 0);
@@ -278,8 +214,8 @@ async function main() {
 
   for (const member of config.members) {
     console.log(`  Fetching rounds for ${member.name}…`);
-    const apiScores = await fetchRoundsForMember(loginData, member, YEAR);
-    const playerScore = buildPlayerScore(member, apiScores, config.courses);
+    const apiRounds = await fetchRoundsForMember(loginData, member, YEAR);
+    const playerScore = buildPlayerScore(member, apiRounds, config.courses);
     playerScores.push(playerScore);
   }
 
