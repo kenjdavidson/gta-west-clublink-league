@@ -1,7 +1,8 @@
 {
   "league": {
     "name": "West GTA Clublink Men's Invitational",
-    "currentYear": 2026
+    "currentYear": 2026,
+    "bonusRoundsCount": 3
   },
   "members": [
     {
@@ -69,44 +70,67 @@
     {
       "name": "Blue Springs Golf Club",
       "clubId": "20599",
-      "roundsCount": 2,
-      "tee": "blue"
+      "roundsCount": 1
     },
     {
       "name": "Glendale Golf Club",
       "clubId": "20703",
-      "roundsCount": 2,
-      "tee": "blue"
+      "roundsCount": 1
     },
     {
       "name": "Georgetown Golf Club",
       "clubId": "20697",
-      "roundsCount": 2,
-      "tee": "blue"
+      "roundsCount": 1
     },
     {
       "name": "Greystone Golf Club",
       "clubId": "20710",
-      "roundsCount": 1,
-      "tee": "blue"
+      "roundsCount": 1
     },
     {
       "name": "Heron Point Golf Links",
       "clubId": "20719",
-      "roundsCount": 1,
-      "tee": "blue"
+      "roundsCount": 1
     },
     {
       "name": "RattleSnake Point Golf Club - Copperhead",
       "clubId": "20859",
-      "roundsCount": 1,
-      "tee": "blue"
+      "roundsCount": 1
     },
     {
       "name": "RattleSnake Point Golf Club - Sidewinder",
       "clubId": "20858",
-      "roundsCount": 1,
-      "tee": "blue"
+      "roundsCount": 1
+    },
+    {
+      "name": "Hidden Lake Golf Club - New Course",
+      "clubId": "20722",
+      "roundsCount": 0
+    },
+    {
+      "name": "Hidden Lake Golf Club - Old Course",
+      "clubId": "20721",
+      "roundsCount": 0
+    },
+    {
+      "name": "Glen Abbey Golf Club",
+      "clubId": "20699",
+      "roundsCount": 0
+    },
+    {
+      "name": "Glencairn Golf Club - Leithfield-Speyside",
+      "clubId": "20056",
+      "roundsCount": 0
+    },
+    {
+      "name": "Glencairn Golf Club - Scotch Block-Leithfield",
+      "clubId": "20057",
+      "roundsCount": 0
+    },
+    {
+      "name": "Glencairn Golf Club - Speyside-Scotch Block",
+      "clubId": "20058",
+      "roundsCount": 0
     }
   ]
 }

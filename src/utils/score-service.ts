@@ -19,6 +19,9 @@ import type { GolfCanadaScoreHistory } from "../service/golf-canada.js";
 
 const _cache = new Map<number, YearlyScores>();
 
+/** Default number of bonus rounds to count when not specified in config. */
+const DEFAULT_BONUS_ROUNDS_COUNT = 3;
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
@@ -72,7 +75,7 @@ function buildPlayerScore(
           date: score.date,
           courseId: course.clubId,
           courseName: course.name,
-          tee: score.tee ?? course.tee,
+          tee: score.tee,
           score: score.score,
           differential: score.adjustedDifferential,
         });
@@ -81,17 +84,38 @@ function buildPlayerScore(
     }
   }
 
-  // For each course keep only the N best rounds (lowest differential first)
+  // Phase 1: For each course with a required round count (roundsCount > 0),
+  // select the N best rounds (lowest differential first).
   const bestRoundsByCourse: Record<string, Round[]> = {};
-  for (const course of config.courses) {
-    const courseRounds = rounds
-      .filter((r) => r.courseId === course.clubId)
-      .sort((a, b) => a.differential - b.differential)
-      .slice(0, course.roundsCount);
+  const usedRounds = new Set<Round>();
 
-    if (courseRounds.length > 0) {
-      bestRoundsByCourse[course.clubId] = courseRounds;
+  for (const course of config.courses) {
+    if (course.roundsCount > 0) {
+      const courseRounds = rounds
+        .filter((r) => r.courseId === course.clubId)
+        .sort((a, b) => a.differential - b.differential)
+        .slice(0, course.roundsCount);
+
+      if (courseRounds.length > 0) {
+        bestRoundsByCourse[course.clubId] = courseRounds;
+        courseRounds.forEach((r) => usedRounds.add(r));
+      }
     }
+  }
+
+  // Phase 2: From the remaining (unused) rounds across all courses, take the
+  // top N bonus rounds (lowest differential first).
+  const bonusCount = config.league.bonusRoundsCount ?? DEFAULT_BONUS_ROUNDS_COUNT;
+  const bonusRounds = rounds
+    .filter((r) => !usedRounds.has(r))
+    .sort((a, b) => a.differential - b.differential)
+    .slice(0, bonusCount);
+
+  for (const round of bonusRounds) {
+    if (!bestRoundsByCourse[round.courseId]) {
+      bestRoundsByCourse[round.courseId] = [];
+    }
+    bestRoundsByCourse[round.courseId].push(round);
   }
 
   // Total = sum of all best-round differentials, rounded to one decimal

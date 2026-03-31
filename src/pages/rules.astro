@@ -42,19 +42,19 @@ const { currentYear } = config.league;
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
 
         <div>
-          <h3 class="font-semibold text-gray-800 mb-2">Required Rounds (10 total)</h3>
+          <h3 class="font-semibold text-gray-800 mb-2">Required Rounds (7 total)</h3>
           <p class="text-sm text-gray-600 mb-2">Each player must play and record a round at each of the following courses:</p>
           <ul class="space-y-1.5 text-sm text-gray-700">
             <li class="flex items-start gap-2">
-              <span class="text-yellow-600 font-semibold mt-0.5">2×</span>
+              <span class="text-yellow-600 font-semibold mt-0.5">1×</span>
               <span>Georgetown Golf Club</span>
             </li>
             <li class="flex items-start gap-2">
-              <span class="text-yellow-600 font-semibold mt-0.5">2×</span>
+              <span class="text-yellow-600 font-semibold mt-0.5">1×</span>
               <span>Blue Springs Golf Club</span>
             </li>
             <li class="flex items-start gap-2">
-              <span class="text-yellow-600 font-semibold mt-0.5">2×</span>
+              <span class="text-yellow-600 font-semibold mt-0.5">1×</span>
               <span>Glendale Golf Club</span>
             </li>
             <li class="flex items-start gap-2">
@@ -78,11 +78,47 @@ const { currentYear } = config.league;
 
         <hr class="border-gray-100" />
 
+        <div>
+          <h3 class="font-semibold text-gray-800 mb-2">Bonus Rounds (top 3)</h3>
+          <p class="text-sm text-gray-600 mb-2">
+            After counting the best round from each required course, the next <strong>3 best rounds</strong> from
+            any course also count towards your total. These bonus rounds can come from any of the required courses
+            above <em>or</em> from the bonus-eligible courses below:
+          </p>
+          <ul class="space-y-1.5 text-sm text-gray-700">
+            <li class="flex items-start gap-2">
+              <span class="text-green-600 font-semibold mt-0.5">+</span>
+              <span>Hidden Lake Golf Club – New Course</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-600 font-semibold mt-0.5">+</span>
+              <span>Hidden Lake Golf Club – Old Course</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-600 font-semibold mt-0.5">+</span>
+              <span>Glen Abbey Golf Club</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-600 font-semibold mt-0.5">+</span>
+              <span>Glencairn Golf Club – Leithfield-Speyside</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-600 font-semibold mt-0.5">+</span>
+              <span>Glencairn Golf Club – Scotch Block-Leithfield</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-600 font-semibold mt-0.5">+</span>
+              <span>Glencairn Golf Club – Speyside-Scotch Block</span>
+            </li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-2">
+            No rounds are required at the bonus-eligible courses — they only count toward bonus scoring.
+          </p>
+        </div>
+
+        <hr class="border-gray-100" />
+
         <ul class="space-y-2 text-sm text-gray-700">
-          <li class="flex items-start gap-2">
-            <span class="text-green-600 mt-0.5">✓</span>
-            All rounds to be played from the <strong>Blue tees</strong>
-          </li>
           <li class="flex items-start gap-2">
             <span class="text-green-600 mt-0.5">✓</span>
             All scores must be recorded in <strong>Golf Canada</strong> to count
@@ -90,6 +126,10 @@ const { currentYear } = config.league;
           <li class="flex items-start gap-2">
             <span class="text-green-600 mt-0.5">✓</span>
             <strong>Gross scores only</strong>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-green-600 mt-0.5">✓</span>
+            Rounds from <strong>any tee</strong> are eligible — no tee requirement
           </li>
           <li class="flex items-start gap-2">
             <span class="text-green-600 mt-0.5">✓</span>

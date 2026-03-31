@@ -11,8 +11,41 @@ function formatDifferential(value: number): string {
   return value.toFixed(1);
 }
 
+/**
+ * Computes the effective number of columns to show for each course.
+ * At minimum, this is course.roundsCount (required rounds); but if any player
+ * has bonus rounds at the course, extra columns are shown for those too.
+ */
+function buildEffectiveColsMap(
+  courses: Course[],
+  players: PlayerScore[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const course of courses) {
+    let max = course.roundsCount;
+    for (const player of players) {
+      const rounds = player.bestRoundsByCourse[course.clubId] ?? [];
+      max = Math.max(max, rounds.length);
+    }
+    map.set(course.clubId, max);
+  }
+  return map;
+}
+
 export function Leaderboard({ scores, courses, showNames = true }: LeaderboardProps) {
   const { players } = scores;
+
+  const effectiveColsMap = buildEffectiveColsMap(courses, players);
+
+  // Only render courses that have at least one column to show.
+  const visibleCourses = courses.filter(
+    (c) => (effectiveColsMap.get(c.clubId) ?? 0) > 0
+  );
+
+  const totalScoreCols = visibleCourses.reduce(
+    (sum, c) => sum + (effectiveColsMap.get(c.clubId) ?? 0),
+    0
+  );
 
   return (
     <div>
@@ -34,11 +67,11 @@ export function Leaderboard({ scores, courses, showNames = true }: LeaderboardPr
                   Player
                 </th>
               )}
-              {courses.map((course) => (
+              {visibleCourses.map((course) => (
                 <th
                   key={course.clubId}
                   scope="col"
-                  colSpan={course.roundsCount}
+                  colSpan={effectiveColsMap.get(course.clubId)}
                   className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider border-l border-green-700"
                 >
                   <span className="block">{course.name}</span>
@@ -51,20 +84,24 @@ export function Leaderboard({ scores, courses, showNames = true }: LeaderboardPr
                 Total
               </th>
             </tr>
-            {/* Sub-header: round numbers */}
+            {/* Sub-header: round numbers (required in green, bonus in yellow) */}
             <tr className="bg-green-50 text-green-800 text-xs">
               <th className="px-4 py-2" />
               {showNames && <th className="px-4 py-2" />}
-              {courses.map((course) =>
-                Array.from({ length: course.roundsCount }, (_, i) => (
-                  <th
-                    key={`${course.clubId}-r${i + 1}`}
-                    className={`px-4 py-2 text-center font-medium ${i === 0 ? "border-l border-green-200" : ""}`}
-                  >
-                    R{i + 1}
-                  </th>
-                ))
-              )}
+              {visibleCourses.map((course) => {
+                const numCols = effectiveColsMap.get(course.clubId) ?? 0;
+                return Array.from({ length: numCols }, (_, i) => {
+                  const isBonus = i >= course.roundsCount;
+                  return (
+                    <th
+                      key={`${course.clubId}-r${i + 1}`}
+                      className={`px-4 py-2 text-center font-medium ${i === 0 ? "border-l border-green-200" : ""} ${isBonus ? "text-yellow-600" : ""}`}
+                    >
+                      R{i + 1}
+                    </th>
+                  );
+                });
+              })}
               <th className="px-4 py-2 border-l border-green-200" />
             </tr>
           </thead>
@@ -74,7 +111,8 @@ export function Leaderboard({ scores, courses, showNames = true }: LeaderboardPr
                 key={player.member.cardId}
                 rank={index + 1}
                 player={player}
-                courses={courses}
+                courses={visibleCourses}
+                effectiveColsMap={effectiveColsMap}
                 year={scores.year}
                 showNames={showNames}
               />
@@ -82,12 +120,7 @@ export function Leaderboard({ scores, courses, showNames = true }: LeaderboardPr
             {players.length === 0 && (
               <tr>
                 <td
-                  colSpan={
-                    1 +
-                    (showNames ? 1 : 0) +
-                    courses.reduce((sum, c) => sum + c.roundsCount, 0) +
-                    1
-                  }
+                  colSpan={1 + (showNames ? 1 : 0) + totalScoreCols + 1}
                   className="px-4 py-12 text-center text-gray-400"
                 >
                   No scores available yet for this season.
@@ -108,11 +141,12 @@ interface PlayerRowProps {
   rank: number;
   player: PlayerScore;
   courses: Course[];
+  effectiveColsMap: Map<string, number>;
   year: number;
   showNames: boolean;
 }
 
-function PlayerRow({ rank, player, courses, year, showNames }: PlayerRowProps) {
+function PlayerRow({ rank, player, courses, effectiveColsMap, year, showNames }: PlayerRowProps) {
   const isLeader = rank === 1;
 
   return (
@@ -150,8 +184,9 @@ function PlayerRow({ rank, player, courses, year, showNames }: PlayerRowProps) {
 
       {/* Best rounds per course */}
       {courses.map((course) => {
+        const numCols = effectiveColsMap.get(course.clubId) ?? 0;
         const bestRounds = player.bestRoundsByCourse[course.clubId] ?? [];
-        return Array.from({ length: course.roundsCount }, (_, i) => {
+        return Array.from({ length: numCols }, (_, i) => {
           const round = bestRounds[i];
           return (
             <td
