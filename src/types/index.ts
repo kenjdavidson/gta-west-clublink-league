@@ -14,6 +14,7 @@ export interface Course {
 export interface League {
   name: string;
   currentYear: number;
+  bonusRoundsCount?: number;
 }
 
 export interface LeagueConfig {
