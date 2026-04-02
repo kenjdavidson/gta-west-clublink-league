@@ -158,8 +158,10 @@ export async function getYearlyScores(
       const yearScores = filterByYear(history, year);
       players.push(buildPlayerScore(member, yearScores, config));
     } catch (err) {
-      // Member is skipped (no entry in players array) on API failure.
-      console.error(`[score-service] Failed to fetch scores for ${member.name} — skipping:`, err);
+      // Member is included with empty scores on API failure so they still
+      // appear on the leaderboard.
+      console.error(`[score-service] Failed to fetch scores for ${member.name} — including with empty scores:`, err);
+      players.push(buildPlayerScore(member, [], config));
     }
   }
 
