@@ -1,7 +1,7 @@
 export interface Member {
   name: string;
   individualId: number;
-  cardId: string;
+  cardId?: string;
 }
 
 export interface Course {

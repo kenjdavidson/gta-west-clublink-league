@@ -108,7 +108,7 @@ export function Leaderboard({ scores, courses, showNames = true }: LeaderboardPr
           <tbody className="divide-y divide-gray-100">
             {players.map((player, index) => (
               <PlayerRow
-                key={player.member.cardId}
+                key={player.member.individualId}
                 rank={index + 1}
                 player={player}
                 courses={visibleCourses}
