@@ -1,26 +1,33 @@
 ---
 import * as fs from "fs";
 import * as path from "path";
-import Layout from "../layouts/Layout.astro";
-import Header from "../components/Header.astro";
-import type { LeagueConfig } from "../types/index.js";
+import Layout from "../../layouts/Layout.astro";
+import Header from "../../components/Header.astro";
+import type { LeagueConfig } from "../../types/index.js";
+
+export async function getStaticPaths() {
+  const configPath = path.join(process.cwd(), "config", "league.json");
+  const config: LeagueConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  return [{ params: { year: String(config.league.currentYear) } }];
+}
+
+const { year } = Astro.params;
 
 const configPath = path.join(process.cwd(), "config", "league.json");
 const config: LeagueConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-const { currentYear } = config.league;
 
 const paid = config.members.filter((m) => m.paid);
 const unpaid = config.members.filter((m) => !m.paid);
 ---
 
-<Layout title={`Dues – ${config.league.name}`} years={[currentYear]} currentYear={currentYear}>
-  <Header years={[currentYear]} currentYear={currentYear} leagueName={config.league.name} />
+<Layout title={`Dues – ${config.league.name} ${year}`} years={[Number(year)]} currentYear={Number(year)}>
+  <Header years={[Number(year)]} currentYear={Number(year)} leagueName={config.league.name} />
 
   <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1">
 
     <div class="mb-8">
       <h1 class="text-3xl font-bold text-green-900 mb-2">Dues</h1>
-      <p class="text-gray-500 text-sm">West GTA Clublink Men's Invitational — {currentYear} Season</p>
+      <p class="text-gray-500 text-sm">West GTA Clublink Men's Invitational — {year} Season</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
@@ -71,8 +78,17 @@ const unpaid = config.members.filter((m) => !m.paid);
         <a href="mailto:westgtaclinvitational@gmail.com" class="text-green-700 hover:underline font-medium">
           westgtaclinvitational@gmail.com
         </a>{" "}
-        before <strong>May 1st, {currentYear}</strong>.
+        before <strong>May 1st, {year}</strong>.
       </p>
+    </div>
+
+    <div class="mt-6">
+      <a
+        href={`${import.meta.env.BASE_URL}${year}`}
+        class="text-xs text-green-700 hover:underline"
+      >
+        ← Back to leaderboard
+      </a>
     </div>
 
   </main>
