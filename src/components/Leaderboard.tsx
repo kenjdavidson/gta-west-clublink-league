@@ -179,6 +179,15 @@ function PlayerRow({ rank, player, courses, effectiveColsMap, year, showNames }:
           >
             {player.member.name}
           </a>
+          {!player.member.paid && (
+            <span
+              className="ml-1.5 text-red-500 font-bold"
+              title="Dues not yet paid"
+              aria-label="Dues not yet paid"
+            >
+              $
+            </span>
+          )}
         </td>
       )}
 

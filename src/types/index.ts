@@ -2,6 +2,7 @@ export interface Member {
   name: string;
   individualId: number;
   cardId?: string;
+  paid?: boolean;
 }
 
 export interface Course {

@@ -35,6 +35,12 @@ const base = import.meta.env.BASE_URL;
         >
           Rules
         </a>
+        <a
+          href={`${base}${currentYear}/dues`}
+          class="text-sm font-medium text-green-200 hover:bg-green-700 hover:text-white px-3 py-1.5 rounded-md transition-colors"
+        >
+          Dues
+        </a>
         {
           years.length > 1 && (
             years.map((y) => (
