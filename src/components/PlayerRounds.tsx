@@ -53,6 +53,15 @@ export function PlayerRounds({ player, courses }: PlayerRoundsProps) {
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">
         {player.member.name}
+        {!player.member.paid && (
+          <span
+            className="ml-2 text-red-500 font-bold"
+            title="Dues not yet paid"
+            aria-label="Dues not yet paid"
+          >
+            $
+          </span>
+        )}
       </h1>
 
       {player.rounds.length === 0 ? (

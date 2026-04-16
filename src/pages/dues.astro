@@ -1,0 +1,79 @@
+---
+import * as fs from "fs";
+import * as path from "path";
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import type { LeagueConfig } from "../types/index.js";
+
+const configPath = path.join(process.cwd(), "config", "league.json");
+const config: LeagueConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+const { currentYear } = config.league;
+
+const paid = config.members.filter((m) => m.paid);
+const unpaid = config.members.filter((m) => !m.paid);
+---
+
+<Layout title={`Dues – ${config.league.name}`} years={[currentYear]} currentYear={currentYear}>
+  <Header years={[currentYear]} currentYear={currentYear} leagueName={config.league.name} />
+
+  <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1">
+
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-green-900 mb-2">Dues</h1>
+      <p class="text-gray-500 text-sm">West GTA Clublink Men's Invitational — {currentYear} Season</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+      <!-- Paid -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
+          <span class="text-green-500 text-xl">✓</span>
+          Paid ({paid.length})
+        </h2>
+        {paid.length === 0 ? (
+          <p class="text-sm text-gray-400 italic">No payments received yet.</p>
+        ) : (
+          <ul class="space-y-2">
+            {paid.map((member) => (
+              <li class="flex items-center gap-2 text-sm text-gray-800">
+                <span class="text-green-500">✓</span>
+                {member.name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <!-- Unpaid -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-lg font-semibold text-red-700 mb-4 flex items-center gap-2">
+          <span class="text-red-500 font-bold text-xl">$</span>
+          Outstanding ({unpaid.length})
+        </h2>
+        {unpaid.length === 0 ? (
+          <p class="text-sm text-gray-400 italic">Everyone has paid. 🎉</p>
+        ) : (
+          <ul class="space-y-2">
+            {unpaid.map((member) => (
+              <li class="flex items-center gap-2 text-sm text-gray-800">
+                <span class="text-red-500 font-bold">$</span>
+                {member.name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+
+    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-sm text-yellow-800">
+      <p>
+        Entry fee is <strong>$100 per player</strong>. Please send via e-transfer to{" "}
+        <a href="mailto:westgtaclinvitational@gmail.com" class="text-green-700 hover:underline font-medium">
+          westgtaclinvitational@gmail.com
+        </a>{" "}
+        before <strong>May 1st, {currentYear}</strong>.
+      </p>
+    </div>
+
+  </main>
+</Layout>

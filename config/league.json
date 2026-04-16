@@ -8,7 +8,8 @@
     {
       "name": "Ken Davidson",
       "individualId": 1538533,
-      "cardId": "5200043264"
+      "cardId": "5200043264",
+      "paid": true
     },
     {
       "name": "Steve Atrill",
@@ -33,17 +34,20 @@
     {
       "name": "Gary Dephoure",
       "individualId": 3087822,
-      "cardId": "6108121192"
+      "cardId": "6108121192",
+      "paid": true
     },
     {
       "name": "Sean Donovan",
       "individualId": 3199234,
-      "cardId": "6109108591"
+      "cardId": "6109108591",
+      "paid": true
     },
     {
       "name": "Dean Ellis",
       "individualId": 2825283,
-      "cardId": "6106775913"
+      "cardId": "6106775913",
+      "paid": true
     },
     {
       "name": "Chris Sandilands",
@@ -66,7 +70,8 @@
     },
     {
       "name": "Mark Taciuk",
-      "individualId": 3491861      
+      "individualId": 3491861,
+      "paid": true
     },
     {
       "name": "Barry Morgan",
