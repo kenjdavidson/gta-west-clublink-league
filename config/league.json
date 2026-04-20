@@ -2,7 +2,8 @@
   "league": {
     "name": "West GTA Clublink Men's Invitational",
     "currentYear": 2026,
-    "bonusRoundsCount": 3
+    "bonusRoundsCount": 3,
+    "githubRepo": "kenjdavidson/gta-west-clublink-invitational"
   },
   "members": [
     {

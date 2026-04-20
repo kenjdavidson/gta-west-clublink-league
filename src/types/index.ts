@@ -16,6 +16,7 @@ export interface League {
   name: string;
   currentYear: number;
   bonusRoundsCount?: number;
+  githubRepo?: string;
 }
 
 export interface LeagueConfig {
