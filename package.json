@@ -19,8 +19,5 @@
     "react-dom": "^19.2.4",
     "tailwindcss": "^4.2.2"
   },
-  "devDependencies": {
-    "@astrojs/check": "^0.9.9",
-    "typescript": "^5.9.3"
-  }
+  "devDependencies": {}
 }
