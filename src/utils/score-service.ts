@@ -27,7 +27,7 @@ const EIGHTEEN_HOLE_ROUND = "18";
 
 /**
  * Golf Canada score type indicating the round was played at the member's home
- * club. Used as a fallback when the API omits the course name (`course: null`).
+ * club. Logged for diagnostics when the API omits the course name.
  */
 const HOME_SCORE_TYPE = "H";
 
@@ -73,10 +73,10 @@ function filterByYear(
  * Builds a PlayerScore from a member's Golf Canada history for the given year.
  *
  * When the Golf Canada API returns `course: null` for a score (which can
- * happen for certain account configurations), course-name matching is skipped
- * for that round. However, if the score has `type === "H"` (home-club score)
- * **and** the member has `homeClubId` configured, the round is attributed to
- * the member's home course as a fallback.
+ * happen when the authenticated user is not following the member, or due to
+ * account privacy settings), the round cannot be matched to a league course
+ * and will be skipped. A warning is logged so the issue is visible in the
+ * build output.
  */
 function buildPlayerScore(
   member: Member,
@@ -89,10 +89,9 @@ function buildPlayerScore(
 
   let nullCourseCount = 0;
   let directMatchCount = 0;
-  let homeClubFallbackCount = 0;
 
   for (const score of yearScores) {
-    // Try to match by course name first.
+    // Try to match by course name.
     let resolved = false;
 
     for (const course of config.courses) {
@@ -115,45 +114,23 @@ function buildPlayerScore(
 
     if (resolved) continue;
 
-    // Course name was not matched. Check if course is null.
+    // Round could not be matched by course name.
     if (!score.course) {
       nullCourseCount++;
-      // Fallback: if the score was posted at the member's home club (type "H")
-      // and the member has homeClubId configured, attribute it to that course.
-      if (score.type === HOME_SCORE_TYPE && member.homeClubId) {
-        const homeCourse = config.courses.find((c) => c.clubId === member.homeClubId);
-        if (homeCourse) {
-          rounds.push({
-            date: score.date,
-            courseId: homeCourse.clubId,
-            courseName: homeCourse.name,
-            tee: score.tee,
-            score: score.score,
-            differential: score.adjustedDifferential,
-            holes: score.holes,
-          });
-          console.log(`[score-service]     ↩ Home-club fallback for round ${score.date} (${score.holes} holes, type=${score.type}) → "${homeCourse.name}" (differential: ${score.adjustedDifferential})`);
-          homeClubFallbackCount++;
-        } else {
-          console.warn(`[score-service]     ⚠ Home-club fallback: homeClubId="${member.homeClubId}" not found in course config for ${member.name}`);
-        }
-      } else {
-        console.log(`[score-service]     ✗ Skipped round ${score.date} (${score.holes} holes, type=${score.type}) — course is null and no home-club fallback applies`);
-      }
+      console.log(`[score-service]     ✗ Skipped round ${score.date} (${score.holes} holes, type=${score.type}) — Golf Canada returned course=null (privacy/follow settings?)`);
     } else {
       console.log(`[score-service]     ✗ Skipped round ${score.date} (${score.holes} holes) at "${score.course}" — no matching league course found`);
     }
   }
 
-  const unresolvedNullCount = nullCourseCount - homeClubFallbackCount;
-  if (unresolvedNullCount > 0) {
+  if (nullCourseCount > 0) {
     console.warn(
-      `[score-service]   ⚠ ${member.name} has ${unresolvedNullCount} unresolved score(s) where the Golf Canada API returned course=null. ` +
-      `Check the member's Golf Canada privacy/account settings or add a homeClubId to their config entry.`
+      `[score-service]   ⚠ ${member.name} has ${nullCourseCount} score(s) where the Golf Canada API returned course=null. ` +
+      `This typically means the authenticated user is not following this member on Golf Canada, or their account has privacy restrictions.`
     );
   }
 
-  console.log(`[score-service]   → ${directMatchCount + homeClubFallbackCount} round(s) matched to league courses (${homeClubFallbackCount} via home-club fallback)`);
+  console.log(`[score-service]   → ${directMatchCount} round(s) matched to league courses`);
 
   // Phase 1: For each course with a required round count (roundsCount > 0),
   // select the N best rounds (lowest differential first).
