@@ -25,6 +25,12 @@ const DEFAULT_BONUS_ROUNDS_COUNT = 3;
 /** Hole count value used by Golf Canada to identify 18-hole rounds. */
 const EIGHTEEN_HOLE_ROUND = "18";
 
+/**
+ * Golf Canada score type indicating the round was played at the member's home
+ * club. Logged for diagnostics when the API omits the course name.
+ */
+const HOME_SCORE_TYPE = "H";
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
@@ -65,6 +71,12 @@ function filterByYear(
 
 /**
  * Builds a PlayerScore from a member's Golf Canada history for the given year.
+ *
+ * When the Golf Canada API returns `course: null` for a score (which can
+ * happen when the authenticated user is not following the member, or due to
+ * account privacy settings), the round cannot be matched to a league course
+ * and will be skipped. A warning is logged so the issue is visible in the
+ * build output.
  */
 function buildPlayerScore(
   member: Member,
@@ -73,7 +85,15 @@ function buildPlayerScore(
 ): PlayerScore {
   const rounds: Round[] = [];
 
+  console.log(`[score-service]   Processing ${yearScores.length} score(s) for ${member.name}`);
+
+  let nullCourseCount = 0;
+  let directMatchCount = 0;
+
   for (const score of yearScores) {
+    // Try to match by course name.
+    let resolved = false;
+
     for (const course of config.courses) {
       if (courseNameMatches(score.course, course.name)) {
         rounds.push({
@@ -85,10 +105,32 @@ function buildPlayerScore(
           differential: score.adjustedDifferential,
           holes: score.holes,
         });
+        console.log(`[score-service]     ✓ Matched round ${score.date} (${score.holes} holes) → "${course.name}" (differential: ${score.adjustedDifferential})`);
+        directMatchCount++;
+        resolved = true;
         break; // matched — stop checking other courses
       }
     }
+
+    if (resolved) continue;
+
+    // Round could not be matched by course name.
+    if (!score.course) {
+      nullCourseCount++;
+      console.log(`[score-service]     ✗ Skipped round ${score.date} (${score.holes} holes, type=${score.type}) — Golf Canada returned course=null (privacy/follow settings?)`);
+    } else {
+      console.log(`[score-service]     ✗ Skipped round ${score.date} (${score.holes} holes) at "${score.course}" — no matching league course found`);
+    }
   }
+
+  if (nullCourseCount > 0) {
+    console.warn(
+      `[score-service]   ⚠ ${member.name} has ${nullCourseCount} score(s) where the Golf Canada API returned course=null. ` +
+      `This typically means the authenticated user is not following this member on Golf Canada, or their account has privacy restrictions.`
+    );
+  }
+
+  console.log(`[score-service]   → ${directMatchCount} round(s) matched to league courses`);
 
   // Phase 1: For each course with a required round count (roundsCount > 0),
   // select the N best rounds (lowest differential first).
@@ -132,6 +174,9 @@ function buildPlayerScore(
         .reduce((sum, r) => sum + r.differential, 0) * 10
     ) / 10;
 
+  const countingRounds = Object.values(bestRoundsByCourse).flat().length;
+  console.log(`[score-service]   → ${countingRounds} counting round(s) selected, total score: ${totalScore}`);
+
   return { member, rounds, bestRoundsByCourse, totalScore };
 }
 
@@ -156,12 +201,16 @@ export async function getYearlyScores(
     return _cache.get(year)!;
   }
 
+  console.log(`[score-service] Building leaderboard for year ${year} — ${config.members.length} member(s), ${config.courses.length} course(s)`);
+
   const players: PlayerScore[] = [];
 
   for (const member of config.members) {
+    console.log(`[score-service] Fetching scores for ${member.name} (individualId: ${member.individualId})…`);
     try {
       const history = await getHistory(member.individualId);
       const yearScores = filterByYear(history, year);
+      console.log(`[score-service]   ${history.length} total record(s) → ${yearScores.length} in ${year}`);
       players.push(buildPlayerScore(member, yearScores, config));
     } catch (err) {
       // Member is included with empty scores on API failure so they still
@@ -179,6 +228,8 @@ export async function getYearlyScores(
     if (roundsB !== roundsA) return roundsB - roundsA;
     return a.totalScore - b.totalScore;
   });
+
+  console.log(`[score-service] Leaderboard for ${year} built successfully`);
 
   const result: YearlyScores = {
     year,
