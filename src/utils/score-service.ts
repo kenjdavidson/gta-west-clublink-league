@@ -156,19 +156,30 @@ function buildPlayerScore(
     }
   }
 
-  // Phase 2: From the remaining (unused) rounds across all courses, take the
-  // top N bonus rounds (lowest gross score first).
+  // Phase 2: From the remaining (unused) rounds across all courses, take up to
+  // N bonus rounds (lowest gross score first), but never exceed each course's
+  // configured maximum counting rounds.
   const bonusCount = config.league.bonusRoundsCount ?? DEFAULT_BONUS_ROUNDS_COUNT;
-  const bonusRounds = rounds
+  const courseMaxRounds = new Map<string, number>(
+    config.courses.map((course) => [course.clubId, course.roundsCount > 0 ? course.roundsCount : 1])
+  );
+  const bonusCandidates = rounds
     .filter((r) => !usedRounds.has(r) && r.holes === EIGHTEEN_HOLE_ROUND)
-    .sort((a, b) => a.score - b.score)
-    .slice(0, bonusCount);
+    .sort((a, b) => a.score - b.score);
+  let selectedBonusRounds = 0;
 
-  for (const round of bonusRounds) {
+  for (const round of bonusCandidates) {
+    if (selectedBonusRounds >= bonusCount) break;
+
+    const maxRounds = courseMaxRounds.get(round.courseId) ?? 0;
+    const alreadySelected = bestRoundsByCourse[round.courseId]?.length ?? 0;
+    if (alreadySelected >= maxRounds) continue;
+
     if (!bestRoundsByCourse[round.courseId]) {
       bestRoundsByCourse[round.courseId] = [];
     }
     bestRoundsByCourse[round.courseId].push(round);
+    selectedBonusRounds++;
   }
 
   // Total = sum of all best-round gross scores
