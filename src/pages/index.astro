@@ -26,7 +26,12 @@ const pageTitle = `${config.league.name} – ${currentYear}`;
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {scores.players.length > 0 ? (
-      <Leaderboard client:load scores={scores} courses={config.courses} />
+      <Leaderboard
+        client:load
+        scores={scores}
+        courses={config.courses}
+        bonusRoundsCount={config.league.bonusRoundsCount}
+      />
     ) : (
       <p class="p-8 text-center text-gray-500">No score data available yet for this season.</p>
     )}

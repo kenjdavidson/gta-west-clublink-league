@@ -89,6 +89,8 @@ function buildPlayerScore(
   config: LeagueConfig
 ): PlayerScore {
   const rounds: Round[] = [];
+  const roundIds = new Map<Round, number>();
+  let nextRoundId = 1;
 
   console.log(`[score-service]   Processing ${yearScores.length} score(s) for ${member.name}`);
 
@@ -101,7 +103,7 @@ function buildPlayerScore(
 
     for (const course of config.courses) {
       if (courseNameMatches(score.course, course.name)) {
-        rounds.push({
+        const round: Round = {
           date: score.date,
           courseId: course.clubId,
           courseName: course.name,
@@ -109,7 +111,9 @@ function buildPlayerScore(
           score: score.score,
           differential: score.adjustedDifferential,
           holes: score.holes,
-        });
+        };
+        roundIds.set(round, nextRoundId++);
+        rounds.push(round);
         console.log(`[score-service]     ✓ Matched round ${score.date} (${score.holes} holes) → "${course.name}" (differential: ${score.adjustedDifferential})`);
         directMatchCount++;
         resolved = true;
@@ -140,7 +144,7 @@ function buildPlayerScore(
   // Phase 1: For each course with a required round count (roundsCount > 0),
   // select the N best rounds (lowest gross score first).
   const bestRoundsByCourse: Record<string, Round[]> = {};
-  const usedRounds = new Set<Round>();
+  const usedRoundIds = new Set<number>();
 
   for (const course of config.courses) {
     if (course.roundsCount > 0) {
@@ -151,34 +155,34 @@ function buildPlayerScore(
 
       if (courseRounds.length > 0) {
         bestRoundsByCourse[course.clubId] = courseRounds;
-        courseRounds.forEach((r) => usedRounds.add(r));
+        courseRounds.forEach((r) => {
+          const roundId = roundIds.get(r);
+          if (roundId !== undefined) usedRoundIds.add(roundId);
+        });
       }
     }
   }
 
   // Phase 2: From the remaining (unused) rounds across all courses, take up to
-  // N bonus rounds (lowest gross score first), but never exceed each course's
-  // configured maximum counting rounds.
+  // N bonus rounds (lowest gross score first).
   const bonusCount = config.league.bonusRoundsCount ?? DEFAULT_BONUS_ROUNDS_COUNT;
-  const courseMaxRounds = new Map<string, number>(
-    config.courses.map((course) => [course.clubId, course.roundsCount > 0 ? course.roundsCount : 1])
-  );
   const bonusCandidates = rounds
-    .filter((r) => !usedRounds.has(r) && r.holes === EIGHTEEN_HOLE_ROUND)
+    .filter((r) => {
+      const roundId = roundIds.get(r);
+      return roundId !== undefined && !usedRoundIds.has(roundId) && r.holes === EIGHTEEN_HOLE_ROUND;
+    })
     .sort((a, b) => a.score - b.score);
   let selectedBonusRounds = 0;
 
   for (const round of bonusCandidates) {
     if (selectedBonusRounds >= bonusCount) break;
 
-    const maxRounds = courseMaxRounds.get(round.courseId) ?? 0;
-    const alreadySelected = bestRoundsByCourse[round.courseId]?.length ?? 0;
-    if (alreadySelected >= maxRounds) continue;
-
     if (!bestRoundsByCourse[round.courseId]) {
       bestRoundsByCourse[round.courseId] = [];
     }
     bestRoundsByCourse[round.courseId].push(round);
+    const roundId = roundIds.get(round);
+    if (roundId !== undefined) usedRoundIds.add(roundId);
     selectedBonusRounds++;
   }
 
