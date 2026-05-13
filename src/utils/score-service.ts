@@ -89,7 +89,7 @@ function buildPlayerScore(
   config: LeagueConfig
 ): PlayerScore {
   const rounds: Round[] = [];
-  const roundIds = new WeakMap<Round, number>();
+  const roundIds = new Map<Round, number>();
   let nextRoundId = 1;
 
   console.log(`[score-service]   Processing ${yearScores.length} score(s) for ${member.name}`);
