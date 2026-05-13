@@ -53,6 +53,14 @@ function normalise(s: string): string {
 }
 
 /**
+ * Stable identifier for a round record used to prevent counting the same
+ * underlying score more than once.
+ */
+function roundKey(round: Round): string {
+  return `${round.date}|${round.courseId}|${round.score}|${round.holes}|${round.tee ?? ""}`;
+}
+
+/**
  * Returns true when the Golf Canada course name is a plausible match for a
  * configured league course name. Both strings are normalised before comparison.
  * Returns false when either name is null or empty.
@@ -140,7 +148,7 @@ function buildPlayerScore(
   // Phase 1: For each course with a required round count (roundsCount > 0),
   // select the N best rounds (lowest gross score first).
   const bestRoundsByCourse: Record<string, Round[]> = {};
-  const usedRounds = new Set<Round>();
+  const usedRoundKeys = new Set<string>();
 
   for (const course of config.courses) {
     if (course.roundsCount > 0) {
@@ -151,7 +159,7 @@ function buildPlayerScore(
 
       if (courseRounds.length > 0) {
         bestRoundsByCourse[course.clubId] = courseRounds;
-        courseRounds.forEach((r) => usedRounds.add(r));
+        courseRounds.forEach((r) => usedRoundKeys.add(roundKey(r)));
       }
     }
   }
@@ -160,7 +168,7 @@ function buildPlayerScore(
   // N bonus rounds (lowest gross score first).
   const bonusCount = config.league.bonusRoundsCount ?? DEFAULT_BONUS_ROUNDS_COUNT;
   const bonusCandidates = rounds
-    .filter((r) => !usedRounds.has(r) && r.holes === EIGHTEEN_HOLE_ROUND)
+    .filter((r) => !usedRoundKeys.has(roundKey(r)) && r.holes === EIGHTEEN_HOLE_ROUND)
     .sort((a, b) => a.score - b.score);
   let selectedBonusRounds = 0;
 
@@ -171,6 +179,7 @@ function buildPlayerScore(
       bestRoundsByCourse[round.courseId] = [];
     }
     bestRoundsByCourse[round.courseId].push(round);
+    usedRoundKeys.add(roundKey(round));
     selectedBonusRounds++;
   }
 
