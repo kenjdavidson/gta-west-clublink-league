@@ -22,7 +22,8 @@
     {
       "name": "Ian Bennett",
       "individualId": 3056750,
-      "cardId": "6107922710"
+      "cardId": "6107922710",
+      "paid": true
     },
     {
       "name": "Jay Bondy",
